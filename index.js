@@ -1,12 +1,7 @@
-import express from "express";
-import cors from "cors";
-import mongoose from "mongoose";
-
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
 const app = express();
-
-app.use(express.json());
-app.use(express.urlencoded());
-app.use(cors());
 
 const options = {
     useNewUrlParser: true,
@@ -19,52 +14,58 @@ const options = {
     family: 4 // Use IPv4, skip trying IPv6
 }
 
-mongoose.connect("mongodb://localhost:27017/surveyDB", options, (err) => {
-    if (!err) {
-        console.log("DB connected");
-    } else {
-        console.log("Error")
+const mongoURI = 'mongodb://localhost:27017/quizDB'; 
+mongoose.connect(mongoURI, options).then(() => {
+  console.log('Connected to MongoDB');
+}).catch(err => {
+  console.error('Error connecting to MongoDB:', err);
+});
+
+const quizSchema = new mongoose.Schema({
+  question: { type: String, required: true },
+  options: { type: [String], required: true },
+  answer: { type: String, required: true },
+});
+
+const Quiz = mongoose.model('Quiz', quizSchema);
+
+app.use(bodyParser.json());
+
+// API endpoint to fetch quiz data
+app.get('/api/quiz', async (req, res) => {
+  try {
+    const quizData = await Quiz.find();
+
+    res.json(quizData);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint to add quiz data
+app.post('/api/quiz', async (req, res) => {
+  try {
+    const { question, options, answer } = req.body;
+
+    if (!question || !options || !answer) {
+      return res.status(400).json({ error: 'Please provide question, options, and answer' });
     }
-});
 
-const userSchema = new mongoose.Schema({
-    firstName: String,
-    middleName: String,
-    lastName: String,
-    birthday: String,
-    email: String,
-    commEmail: String,
-    interests: String,
-    moderatePercentile: String,
-    growthPercentile: String,
-    aggressiveGrowthPercentile: String,
-    ageGroup: String,
-    websiteLink: String,
-    emailType: String,
-    facebookLink: String,
-    twitterLink: String,
-    linkedLink: String
-});
-
-const User = new mongoose.model("User", userSchema);
-
-//Routes
-app.get("/", (req, res) => {
-    res.send("My Servey API");
-});
-
-app.post("/survey", (req, res) => {
-    const userFields = req.body;
-    const user = new User(userFields);
-    user.save((err) => {
-        if (err) {
-            res.send(err);
-        } else {
-            res.send({message: "Successfully Registered"});
-        }
+    const newQuiz = new Quiz({
+      question,
+      options,
+      answer,
     });
+
+    await newQuiz.save();
+
+    res.status(201).json(newQuiz);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-app.listen(9002, () => {
-    console.log("Server is up and running at port 9002...");
+const port = 9002; 
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
